@@ -145,11 +145,16 @@ make_connection(XmppCom, JID, Pass, Server, Port, 0) ->
     exmpp_session:stop(XmppCom),
     make_connection(JID, Pass, Server, Port);
 make_connection(XmppCom, JID, Pass, Server, Port, Tries) ->
-    lager:info("Connecting: ~p Tries Left~n",[Tries]),
-    [User, SServer] = string:tokens(JID, "@"),
-    MyJID = exmpp_jid:make(User, Server, random),
-    exmpp_session:auth_basic_digest(XmppCom, MyJID, Pass),
-    try exmpp_session:connect_TCP(XmppCom, SServer, Port) of
+    lager:info("Connecting: ~p Tries Left~n",[Tries]),    
+    MyJID = exmpp_jid:parse(JID),
+    case exmpp_jid:resource(MyJID) of
+        undefined ->
+            FJID = exmpp_jid:full(MyJID, random);
+        _ ->
+            FJID = MyJID
+    end,
+    exmpp_session:auth_basic_digest(XmppCom, FJID, Pass),
+    try exmpp_session:connect_TCP(XmppCom, Server, Port) of
         R -> 
             exmpp_session:login(XmppCom),
             lager:info("Connected.~n",[]),
