@@ -132,6 +132,22 @@ The first you need to do is configure the ecomponent for launch the test. The co
 
 * `disco-info`: is present as will sent to clients, but the main tag can be setted with its attribute `active` as `true` or `false`. If you set the `active` attribute as `false` you can leave empty the `disco-info` tag.
 
+* `access-list-get` and `access-list-set`: is used when you want block incoming stanzas from client (set or get) with a specific jid. You must specify the iq NS and its children are a list of items blocked, example:
+
+```xml
+<!-- a full example -->
+<access-list-get>
+    <iq xmlns="urn:itself">
+        <item value="alice@localhost"/>
+    </iq>
+</access-list-get>
+<access-list-set>
+    <iq xmlns="urn:itself">
+        <item value="alice.localhost"/>
+    </iq>
+</access-list-set>
+```
+
 ### Mock-ups
 
 The code to be tested can be using a database or an external connection or something that could be not available in the test environment. The mock-up help simulating the calls to this elements and give always the same response.
@@ -157,6 +173,11 @@ For example, if you use [`emysql`](https://github.com/Eonblast/Emysql) for conne
 This system uses internally [`meck`](https://github.com/eproxus/meck) the call for this is equivalent to `meck:expect/3`.
 
 The arity for the code defined should be the same that the function you want to replace (or mock-up).
+
+The `mockups` tag have the following attributes you can use to improve the use of the mocks:
+
+- *passthrough*: when you want to mock a module but not all the functions the module have, you can use this attribute setting as `true`.
+- *strict*: set this attribute to `true` if you need to mock a module that doesn't exists.
 
 ### Start and Stop Codes
 
@@ -201,6 +222,20 @@ The steps should be executed in the order appears in the file. The log show the 
 </step>
 ```
 
+You can add more than one stanza inside the step, all the stanzas should arrive (in whatever order) so, it's very useful if you want to receive more than one stanza and you don't know the order you'll receive them:
+
+```xml
+<step name="receive creation messages" type="receive">
+    <iq xmlns='jabber:client'
+        type='result'
+        id='test_bot2'
+        from='ecomponent.test'/>
+    <message type='chat' id='test_bot3' from='ecomponent.test'>
+    	<body>created!</body>
+    </message>
+</step>
+```
+
 * `store`: save the stanza inside the `step` tag in the variable `Packet` for use in the next step, that should be `code`. The stanza should be parsed before store it.
 
 ```xml
@@ -223,6 +258,12 @@ The steps should be executed in the order appears in the file. The log show the 
     ecomponent:save_id(Id, 'urn:itself', Packet, dummy),
     ecomponent ! getup
 ]]></step>
+```
+
+* `quiet`: waits a specific time and if something is received in that time, throw an error.
+
+```xml
+<step name="nothing should be received" type="quiet" timeout="1000"/>
 ```
 
 The params for the `step` tag are the following:
