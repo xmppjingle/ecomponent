@@ -86,8 +86,12 @@ init([{ID, Group}, JIDdefault, Conf]) ->
     {stop, Reason::any(), State::#state{}}.
 %@hidden
 handle_info(#received_packet{from=To,id=ID}=ReceivedPacket, State) ->
+    lager:debug("Received Packet: ~p~n", [ReceivedPacket]),
     ToBin = exmpp_jid:bare_to_binary(exmpp_jid:make(To)),
-    timem:insert({ID, ToBin}, State#state.group),
+    case ReceivedPacket#received_packet.packet_type of
+        iq -> timem:insert({ID, ToBin}, State#state.group);
+        _ -> ok
+    end,
     ecomponent ! {ReceivedPacket, State#state.group},
     {noreply, State};
 
@@ -132,7 +136,7 @@ handle_info({send, Packet}, #state{xmppCom=XmppCom, jid=JID}=State) ->
         _ ->
             Packet
     end,
-    exmpp_component:send_packet(XmppCom, NewPacket),
+    exmpp_session:send_packet(XmppCom, NewPacket),
     {noreply, State};
 
 handle_info({down, Node}, #state{node=Node, conn_type=F}=State) ->
@@ -187,7 +191,7 @@ handle_cast(_Msg, State) ->
 %@hidden
 handle_call(stop, _From, #state{xmppCom=XmppCom}=State) ->
     lager:info("Component Stopped.~n",[]),
-    exmpp_component:stop(XmppCom),
+    exmpp_session:stop(XmppCom),
     {stop, normal, ok, State};
 
 handle_call(Info, _From, State) ->
@@ -222,7 +226,7 @@ make_connection(JID, Pass, Server, Port, 0) ->
     make_connection(JID, Pass, Server, Port);
 make_connection(JID, Pass, Server, Port, Tries) ->
     lager:info("Connecting: ~p Tries Left~n",[Tries]),
-    XmppCom = exmpp_component:start(),
+    XmppCom = exmpp_session:start(),
     try setup_exmpp_component(XmppCom, JID, Pass, Server, Port) of
         R -> 
             lager:info("Connected.~n",[]),
@@ -230,7 +234,7 @@ make_connection(JID, Pass, Server, Port, Tries) ->
     catch
         Class:Exception ->
             lager:warning("Exception ~p: ~p~n",[Class, Exception]),
-            exmpp_component:stop(XmppCom),
+            exmpp_session:stop(XmppCom),
             clean_exit_normal(),
             timer:sleep((20-Tries) * 200),
             make_connection(JID, Pass, Server, Port, Tries-1)
@@ -239,9 +243,17 @@ make_connection(JID, Pass, Server, Port, Tries) ->
 -spec setup_exmpp_component(XmppCom::pid(), JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer()) -> string().
 %@hidden
 setup_exmpp_component(XmppCom, JID, Pass, Server, Port)->
-    exmpp_component:auth(XmppCom, JID, Pass),
-    exmpp_component:connect(XmppCom, Server, Port),
-    exmpp_component:handshake(XmppCom).
+    lager:debug("Setup with: ~p ~p ~p ~p ~p", [XmppCom, JID, Pass, Server, Port]),
+    MyJID = exmpp_jid:parse(JID),
+    case exmpp_jid:resource(MyJID) of
+        undefined ->
+            FJID = exmpp_jid:full(MyJID, random);
+        _ ->
+            FJID = MyJID
+    end,
+    exmpp_session:auth_basic_digest(XmppCom, FJID, Pass),
+    exmpp_session:connect_TCP(XmppCom, Server, Port),
+    exmpp_session:login(XmppCom).
 
 -spec clean_exit_normal() -> ok.
 %@hidden

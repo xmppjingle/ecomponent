@@ -26,7 +26,9 @@ setup_test_() ->
             multiconnection_test(Config),
             processor_iq_test(Config),
             processor_message_test(Config),
-            processor_presence_test(Config)
+            processor_presence_test(Config),
+            multiping_test(Config),
+            forward_acl_ns_in_set_test(Config)
         ] end
     }.
 
@@ -60,9 +62,9 @@ init_per_suite() ->
         ]},
         {message_processor, {mod, dummy}},
         {presence_processor, {mod, dummy}},
-        {features, [<<"jabber:iq:last">>]}
-    ]),
-    meck:unload(application). 
+        {features, [<<"jabber:iq:last">>]},
+        {mnesia_callback, []}
+    ]). 
 
 end_per_suite(_Config) ->
     mnesia:stop(),
@@ -122,17 +124,19 @@ init(_) ->
         ]},
         {message_processor, {mod, dummy}},
         {presence_processor, {mod, dummy}},
-        {features, [<<"jabber:iq:last">>]}
+        {features, [<<"jabber:iq:last">>]},
+        {mnesia_callback, []}
     ],
     ?meck_config(Conf),
-    meck:new(dummy),
+    meck:new(dummy, [non_strict]),
     {ok, _} = ecomponent:start_link(),
+    {ok, _} = ecomponent_acl:start_link(),
     {ok, _} = ecomponent_con_worker:start_link({default,default}, "ecomponent.test", Conf).
 
 -define(finish(), begin
-    meck:unload(application),
     meck:unload(dummy),
     ecomponent:stop(),
+    ecomponent_acl:stop(),
     ?_assert(true)
 end).
 
@@ -140,14 +144,13 @@ end).
 
 config_test(_Config) ->
     init(config_test),
-    meck:new(dummy),
+    meck:new(dummy, [non_strict]),
     meck:expect(dummy, tables, 0, [{dummy, ram_copies, record_info(fields, dummy)}]), 
     {ok, State, _Timeout} = ecomponent:init([]), 
     meck:unload(dummy), 
     mnesia:table_info(dummy, all), 
     lager:info("~p~n", [State]),
     timer:sleep(250), 
-    meck:unload(application),
     ?_assertMatch(#state{
         jid = "ecomponent.test",
         maxPerPeriod = 15,
@@ -157,14 +160,6 @@ config_test(_Config) ->
         presence_processor = {mod, dummy},
         maxTries = 3,
         requestTimeout = 10,
-        accessListSet = [
-            {'com.ecomponent.ns/ns1', [<<"bob.localhost">>]},
-            {'com.ecomponent.ns/ns2', [<<"bob.localhost">>]},
-            {'com.ecomponent.ns/ns3', [<<"bob.localhost">>]},
-            {'com.ecomponent.ns/ns4', [<<"bob.localhost">>]},
-            {'com.ecomponent.ns/ns5', [<<"bob.localhost">>]},
-            {'com.ecomponent.ns/ns6', [<<"bob.localhost">>]}
-        ],
         syslogFacility = local7,
         syslogName = "ecomponent"}, State).
 
@@ -224,15 +219,15 @@ coutdown_test(_Config) ->
 access_list_get_test(_Config) ->
     init(access_list_get_test),
     Bob1 = {undefined, "bob1.localhost", undefined},
-    true = gen_server:call(ecomponent, {access_list_get, 'com.ecomponent.ns/ns1', Bob1}),
+    true = ecomponent_acl:access_list_get('com.ecomponent.ns/ns1', Bob1),
     ?finish().
 
 access_list_set_test(_Config) ->
     init(access_list_set_test),
     Bob = {undefined, "bob.localhost", undefined},
     Bob1 = {undefined, "bob1.localhost", undefined},
-    ?assert(gen_server:call(ecomponent, {access_list_set, 'com.ecomponent.ns/ns1', Bob})),
-    ?assertNot(gen_server:call(ecomponent, {access_list_set, 'com.ecomponent.ns/ns1', Bob1})),
+    ?assert(ecomponent_acl:access_list_set('com.ecomponent.ns/ns1', Bob)),
+    ?assertNot(ecomponent_acl:access_list_set('com.ecomponent.ns/ns1', Bob1)),
     ?finish().
 
 multiconnection_test(_Config) ->
@@ -249,4 +244,12 @@ processor_message_test(_Config) ->
 
 processor_presence_test(_Config) ->
     ecomponent_func_test:run("processor_presence_test"),
+    ?_assert(true).
+
+multiping_test(_Config) ->
+    ecomponent_func_test:run("multiping_test"),
+    ?_assert(true).
+
+forward_acl_ns_in_set_test(_Config) ->
+    ecomponent_func_test:run("forward_acl_ns_in_set_test"),
     ?_assert(true).
