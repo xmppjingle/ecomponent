@@ -243,9 +243,16 @@ make_connection(JID, Pass, Server, Port, Tries) ->
 -spec setup_exmpp_component(XmppCom::pid(), JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer()) -> string().
 %@hidden
 setup_exmpp_component(XmppCom, JID, Pass, Server, Port)->
-    exmpp_component:auth(XmppCom, JID, Pass),
-    exmpp_component:connect(XmppCom, Server, Port),
-    exmpp_component:handshake(XmppCom).
+    MyJID = exmpp_jid:parse(JID),
+    case exmpp_jid:resource(MyJID) of
+        undefined ->
+            FJID = exmpp_jid:full(MyJID, random);
+        _ ->
+            FJID = MyJID
+    end,
+    exmpp_session:auth_basic_digest(XmppCom, FJID, Pass),
+    exmpp_session:connect_TCP(XmppCom, Server, Port),
+    exmpp_session:login(XmppCom).
 
 -spec clean_exit_normal() -> ok.
 %@hidden
