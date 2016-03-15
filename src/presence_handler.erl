@@ -54,7 +54,7 @@ forward_response(#presence{xmlel=Xmlel}=Presence) ->
     ID = exmpp_stanza:get_id(Xmlel),
     case ecomponent:get_processor(ID) of
     undefined ->
-        processor:process_presence(Presence);
+        forward(Presence);
     #matching{processor=undefined} ->
         processor:process_presence(Presence);
     #matching{processor=App} ->
