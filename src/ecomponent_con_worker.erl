@@ -159,6 +159,14 @@ handle_info({_, tcp_closed}, #state{jid=JID, server=Server, pass=Pass, port=Port
     ecomponent_con:F(State#state.id, State#state.group),
     {noreply, State#state{xmppCom=XmppCom}};
 
+handle_info({stream_error,'system-shutdown'}, #state{jid=JID, server=Server, pass=Pass, port=Port, conn_type=F}=State) ->
+    lager:info("Connection to ~s closed. Trying to reconnect...~n", [Server]),
+    ecomponent_con:down(State#state.id),
+    {_, XmppCom} = make_connection(JID, Pass, Server, Port),
+    lager:info("Reconnected ~s.~n", [Server]),
+    ecomponent_con:F(State#state.id, State#state.group),
+    {noreply, State#state{xmppCom=XmppCom}};
+
 handle_info({_,{bad_return_value, _}}, #state{jid=JID, server=Server, pass=Pass, port=Port, conn_type=F}=State) ->
     lager:info("Connection to ~s closed. Trying to reconnect...~n", [Server]),
     ecomponent_con:down(State#state.id),
