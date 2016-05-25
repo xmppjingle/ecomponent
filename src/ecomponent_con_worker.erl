@@ -238,7 +238,6 @@ make_connection(JID, Pass, Server, Port, Tries) ->
     try setup_exmpp_component(XmppCom, JID, Pass, Server, Port) of
         R -> 
             lager:info("Connected.~n",[]),
-            whereis(ecomponent) ! connected,
             {R, XmppCom}
     catch
         Class:Exception ->
