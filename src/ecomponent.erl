@@ -325,17 +325,7 @@ handle_info(timeout, #state{resend=Resend,requestTimeout=RT}=State) ->
     expired_stanzas(Resend,RT),
     {noreply, reset_countdown(State), State#state.requestTimeout * 1000};
 
-handle_info(Record, State) -> 
-    lager:info("Unknown Info Request: ~p~n", [Record]),
-    {noreply, State, get_countdown(State)}.
-
--spec handle_cast(Msg::any(), State::#state{}) ->
-    {noreply, State::#state{}} |
-    {noreply, State::#state{}, hibernate | infinity | non_neg_integer()} |
-    {stop, Reason::any(), State::#state{}}.
-%@hidden
-
-handle_cast(connected, State) ->
+handle_info(connected, State) ->
     case ecomponent:get_presence_processor() of
     {app, Name} ->
         PID = whereis(Name),            
@@ -350,10 +340,19 @@ handle_cast(connected, State) ->
     end,
     {noreply, State, get_countdown(State)};
 
+handle_info(Record, State) -> 
+    lager:info("Unknown Info Request: ~p~n", [Record]),
+    {noreply, State, get_countdown(State)}.
+
+-spec handle_cast(Msg::any(), State::#state{}) ->
+    {noreply, State::#state{}} |
+    {noreply, State::#state{}, hibernate | infinity | non_neg_integer()} |
+    {stop, Reason::any(), State::#state{}}.
+%@hidden
+
 handle_cast(_Msg, State) ->
     lager:info("Received: ~p~n", [_Msg]), 
     {noreply, State, get_countdown(State)}.
-
 
 -spec handle_call(Msg::any(), From::{pid(),_}, State::#state{}) ->
     {reply, Reply::any(), State::#state{}} |
