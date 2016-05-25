@@ -325,6 +325,21 @@ handle_info(timeout, #state{resend=Resend,requestTimeout=RT}=State) ->
     expired_stanzas(Resend,RT),
     {noreply, reset_countdown(State), State#state.requestTimeout * 1000};
 
+handle_info(connected, State) ->
+    case ecomponent:get_presence_processor() of
+    {app, Name} ->
+        PID = whereis(Name),            
+        case erlang:is_pid(PID) andalso erlang:is_process_alive(PID) of
+        true -> 
+            PID ! connected;
+        _ -> 
+            lager:warning("Process not Alive for Connected Notification: ~p~n", [Name])
+        end;
+    _Proc -> 
+        ok
+    end,
+    {noreply, State, get_countdown(State)};
+
 handle_info(Record, State) -> 
     lager:info("Unknown Info Request: ~p~n", [Record]),
     {noreply, State, get_countdown(State)}.
