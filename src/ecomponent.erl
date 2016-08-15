@@ -316,9 +316,10 @@ handle_info({
 
 handle_info({
         resend, 
-        #matching{tries=Tries}=N}, 
+        #matching{tries=Tries, packet=P, ns=NS}=N}, 
         #state{maxTries=Max}=State) when Tries >= Max ->
     lager:warning("Max tries exceeded for: ~p~n", [N]),
+    ecomponent_metrics:notify_no_response(exmpp_iq:get_type(P), NS),
     {noreply, State, get_countdown(State)};
 
 handle_info(timeout, #state{resend=Resend,requestTimeout=RT}=State) ->

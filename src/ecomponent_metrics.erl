@@ -13,7 +13,7 @@
     notify_dropped_presence/1,
     notify_dropped_message/1,
     notify_dropped_iq/2,
-
+    notify_no_response/2,
     notify/1,
     notify/2
 ]).
@@ -63,6 +63,13 @@ notify_throughput_message(IO, Type) ->
 
 notify_throughput_iq(IO, Type, NS) ->
     notify(concat("iq_throughput_", concat(IO, concat("_", concat(concat(Type, "_"), NS))))).
+
+-spec notify_no_response(Type :: atom(), NS :: atom()) ->
+    ok | {error, Name :: atom(), nonexistent_metric} |
+    {error, Type :: atom(), unsupported_metric_type}.
+
+notify_no_response(Type, NS) ->
+    notify(concat("iq_no_response_", concat(concat(Type, "_"), NS))).
 
 -spec set_iq_time(Id :: binary(), Type :: atom(), NS :: atom()) -> boolean().
 
