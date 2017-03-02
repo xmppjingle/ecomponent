@@ -226,33 +226,39 @@ code_change(_OldVsn, State, _Extra) ->
 -spec make_connection(JID::string(), Pass::string(), Server::string(), Port::integer()) -> {R::string(), XmppCom::pid()}.
 %@hidden
 make_connection(JID, Pass, Server, Port) -> 
-    make_connection(JID, Pass, Server, Port, 20).
+    make_connection(JID, Pass, Server, Port, 20, digest).
     
--spec make_connection(JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Tries::integer()) -> {string(), pid()}.    
+-spec make_connection(JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Tries::integer(), Method::any()) -> {string(), pid()}.    
 %@hidden
-make_connection(JID, Pass, Server, Port, 0) -> 
+make_connection(JID, Pass, Server, Port, 0, _Method) -> 
     make_connection(JID, Pass, Server, Port);
-make_connection(JID, Pass, Server, Port, Tries) ->
+make_connection(JID, Pass, Server, Port, Tries, Method) ->
     lager:info("Connecting: ~p Tries Left~n",[Tries]),
     XmppCom = exmpp_session:start(),
-    try setup_exmpp_component(XmppCom, JID, Pass, Server, Port) of
+    try setup_exmpp_component(XmppCom, JID, Pass, Server, Port, Method) of
         R -> 
             lager:info("Connected.~n",[]),
             whereis(ecomponent) ! connected,
             {R, XmppCom}
     catch
+        _Class:{error, not_auth_method_result} ->
+            lager:info("Fallback to Basic Auth~n",[]),
+            exmpp_session:stop(XmppCom),
+            clean_exit_normal(),
+            timer:sleep((20-Tries) * 200),
+            make_connection(JID, Pass, Server, Port, Tries-1, basic);
         Class:Exception ->
             lager:warning("Exception ~p: ~p~n",[Class, Exception]),
             exmpp_session:stop(XmppCom),
             clean_exit_normal(),
             timer:sleep((20-Tries) * 200),
-            make_connection(JID, Pass, Server, Port, Tries-1)
+            make_connection(JID, Pass, Server, Port, Tries-1, Method)
     end.
 
--spec setup_exmpp_component(XmppCom::pid(), JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer()) -> string().
+-spec setup_exmpp_component(XmppCom::pid(), JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Method::any()) -> string().
 %@hidden
-setup_exmpp_component(XmppCom, JID, Pass, Server, Port)->
-    lager:debug("Setup with: ~p ~p ~p ~p ~p", [XmppCom, JID, Pass, Server, Port]),
+setup_exmpp_component(XmppCom, JID, Pass, Server, Port, Method)->
+    lager:debug("Setup with: ~p ~p ~p ~p ~p", [XmppCom, JID, Pass, Server, Port, Method]),
     MyJID = exmpp_jid:parse(JID),
     case exmpp_jid:resource(MyJID) of
         undefined ->
@@ -260,7 +266,12 @@ setup_exmpp_component(XmppCom, JID, Pass, Server, Port)->
         _ ->
             FJID = MyJID
     end,
-    exmpp_session:auth_basic_digest(XmppCom, FJID, Pass),
+    case Method of
+        digest ->
+            exmpp_session:auth_basic_digest(XmppCom, FJID, Pass);
+        _ ->
+            exmpp_session:auth_basic(XmppCom, FJID, Pass)
+    end,
     exmpp_session:connect_TCP(XmppCom, Server, Port),
     exmpp_session:login(XmppCom).
 
