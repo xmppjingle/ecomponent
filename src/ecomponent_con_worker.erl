@@ -258,7 +258,7 @@ make_connection(JID, Pass, Server, Port, Tries, Method) ->
 -spec setup_exmpp_component(XmppCom::pid(), JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Method::any()) -> string().
 %@hidden
 setup_exmpp_component(XmppCom, JID, Pass, Server, Port, Method)->
-    lager:debug("Setup with: ~p ~p ~p ~p ~p", [XmppCom, JID, Pass, Server, Port, Method]),
+    lager:debug("Setup with: ~p ~p ~p ~p ~p ~p", [XmppCom, JID, Pass, Server, Port, Method]),
     MyJID = exmpp_jid:parse(JID),
     case exmpp_jid:resource(MyJID) of
         undefined ->
