@@ -32,6 +32,9 @@
     code_change/3
 ]).
 
+-define(DIGEST,  "DIGEST-MD5").
+-define(PLAIN,  "PLAIN").
+
 -spec start_link(ID::{atom(),atom()}, JID::ecomponent:jid(), Conf::proplists:proplist()) ->
     {ok,pid()} | ignore | {error,{already_started,pid()}} | {error, term()}.
 %@doc Starts an individual connection. The connection can be to a server or
@@ -226,7 +229,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec make_connection(JID::string(), Pass::string(), Server::string(), Port::integer()) -> {R::string(), XmppCom::pid()}.
 %@hidden
 make_connection(JID, Pass, Server, Port) -> 
-    make_connection(JID, Pass, Server, Port, 20, digest).
+    make_connection(JID, Pass, Server, Port, 20, ?DIGEST).
     
 -spec make_connection(JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Tries::integer(), Method::any()) -> {string(), pid()}.    
 %@hidden
@@ -246,7 +249,7 @@ make_connection(JID, Pass, Server, Port, Tries, Method) ->
             exmpp_session:stop(XmppCom),
             clean_exit_normal(),
             timer:sleep((20-Tries) * 200),
-            make_connection(JID, Pass, Server, Port, Tries-1, basic);
+            make_connection(JID, Pass, Server, Port, Tries-1, ?PLAIN);
         Class:Exception ->
             lager:warning("Exception ~p: ~p~n",[Class, Exception]),
             exmpp_session:stop(XmppCom),
@@ -266,16 +269,10 @@ setup_exmpp_component(XmppCom, JID, Pass, Server, Port, Method)->
         _ ->
             FJID = MyJID
     end,
-    case Method of
-        digest ->
-            exmpp_session:auth_basic_digest(XmppCom, FJID, Pass),
-            exmpp_session:connect_TCP(XmppCom, Server, Port),
-            exmpp_session:login(XmppCom);
-        _ ->
-            exmpp_session:auth_basic(XmppCom, FJID, Pass),
-            exmpp_session:connect_TCP(XmppCom, Server, Port),
-            exmpp_session:login(XmppCom, "PLAIN")
-    end,
+    exmpp_session:auth_info(XmppCom, FJID, Pass),
+    Stream = exmpp_session:connect_TCP(XmppCom, Server, Port),
+    lager:debug("Stream Features: ~p", [Stream]),
+    exmpp_session:login(XmppCom, Method).
 
 -spec clean_exit_normal() -> ok.
 %@hidden
