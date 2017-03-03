@@ -32,8 +32,8 @@
     code_change/3
 ]).
 
--define(DIGEST,  "DIGEST-MD5").
--define(PLAIN,  "PLAIN").
+-define(DIGEST,  <<"DIGEST-MD5">>).
+-define(PLAIN,  <<"PLAIN">>).
 
 -spec start_link(ID::{atom(),atom()}, JID::ecomponent:jid(), Conf::proplists:proplist()) ->
     {ok,pid()} | ignore | {error,{already_started,pid()}} | {error, term()}.
@@ -229,16 +229,16 @@ code_change(_OldVsn, State, _Extra) ->
 -spec make_connection(JID::string(), Pass::string(), Server::string(), Port::integer()) -> {R::string(), XmppCom::pid()}.
 %@hidden
 make_connection(JID, Pass, Server, Port) -> 
-    make_connection(JID, Pass, Server, Port, 20, ?PLAIN).
+    make_connection(JID, Pass, Server, Port, 20).
     
--spec make_connection(JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Tries::integer(), Method::any()) -> {string(), pid()}.    
+-spec make_connection(JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Tries::integer()) -> {string(), pid()}.    
 %@hidden
-make_connection(JID, Pass, Server, Port, 0, _Method) -> 
+make_connection(JID, Pass, Server, Port, 0) -> 
     make_connection(JID, Pass, Server, Port);
-make_connection(JID, Pass, Server, Port, Tries, Method) ->
+make_connection(JID, Pass, Server, Port, Tries) ->
     lager:info("Connecting: ~p Tries Left~n",[Tries]),
     XmppCom = exmpp_session:start(),
-    try setup_exmpp_component(XmppCom, JID, Pass, Server, Port, Method) of
+    try setup_exmpp_component(XmppCom, JID, Pass, Server, Port) of
         R -> 
             lager:info("Connected.~n",[]),
             whereis(ecomponent) ! connected,
@@ -249,13 +249,13 @@ make_connection(JID, Pass, Server, Port, Tries, Method) ->
             exmpp_session:stop(XmppCom),
             clean_exit_normal(),
             timer:sleep((20-Tries) * 200),
-            make_connection(JID, Pass, Server, Port, Tries-1, Method)
+            make_connection(JID, Pass, Server, Port, Tries-1)
     end.
 
--spec setup_exmpp_component(XmppCom::pid(), JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Method::any()) -> string().
+-spec setup_exmpp_component(XmppCom::pid(), JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer()) -> string().
 %@hidden
-setup_exmpp_component(XmppCom, JID, Pass, Server, Port, Method)->
-    lager:debug("Setup with: ~p ~p ~p ~p ~p ~p", [XmppCom, JID, Pass, Server, Port, Method]),
+setup_exmpp_component(XmppCom, JID, Pass, Server, Port)->
+    lager:debug("Setup with: ~p ~p ~p ~p ~p", [XmppCom, JID, Pass, Server, Port]),
     MyJID = exmpp_jid:parse(JID),
     case exmpp_jid:resource(MyJID) of
         undefined ->
@@ -264,9 +264,18 @@ setup_exmpp_component(XmppCom, JID, Pass, Server, Port, Method)->
             FJID = MyJID
     end,
     exmpp_session:auth_info(XmppCom, FJID, Pass),
-    Stream = exmpp_session:connect_TCP(XmppCom, Server, Port),
-    lager:debug("Stream Features: ~p", [Stream]),
-    exmpp_session:login(XmppCom, Method).
+    {_R, _ID, Features} = exmpp_session:connect_TCP(XmppCom, Server, Port),
+    exmpp_session:login(XmppCom, get_method(Features)).
+
+get_method(Features) ->
+    Mechanisms = [ exmpp_xml:get_cdata(X) || X <- exmpp_xml:get_elements(exmpp_xml:get_element(Features, mechanisms), mechanism)],
+    lager:debug("Stream Mechanisms: ~p", [Mechanisms]),
+    preffered_method([ M || M <- Mechanisms, M == ?DIGEST]).
+
+preffered_method([?DIGEST]) ->
+    binary_to_list(?DIGEST);
+preffered_method(_) ->
+    binary_to_list(?PLAIN).
 
 -spec clean_exit_normal() -> ok.
 %@hidden
