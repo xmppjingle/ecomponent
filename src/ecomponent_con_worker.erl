@@ -268,12 +268,14 @@ setup_exmpp_component(XmppCom, JID, Pass, Server, Port, Method)->
     end,
     case Method of
         digest ->
-            exmpp_session:auth_basic_digest(XmppCom, FJID, Pass);
+            exmpp_session:auth_basic_digest(XmppCom, FJID, Pass),
+            exmpp_session:connect_TCP(XmppCom, Server, Port),
+            exmpp_session:login(XmppCom);
         _ ->
-            exmpp_session:auth_basic(XmppCom, FJID, Pass)
+            exmpp_session:auth_basic(XmppCom, FJID, Pass),
+            exmpp_session:connect_TCP(XmppCom, Server, Port),
+            exmpp_session:login(XmppCom, "PLAIN")
     end,
-    exmpp_session:connect_TCP(XmppCom, Server, Port),
-    exmpp_session:login(XmppCom).
 
 -spec clean_exit_normal() -> ok.
 %@hidden
