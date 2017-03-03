@@ -229,7 +229,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec make_connection(JID::string(), Pass::string(), Server::string(), Port::integer()) -> {R::string(), XmppCom::pid()}.
 %@hidden
 make_connection(JID, Pass, Server, Port) -> 
-    make_connection(JID, Pass, Server, Port, 20, ?DIGEST).
+    make_connection(JID, Pass, Server, Port, 20, ?PLAIN).
     
 -spec make_connection(JID::ecomponent:jid(), Pass::string(), Server::string(), Port::integer(), Tries::integer(), Method::any()) -> {string(), pid()}.    
 %@hidden
@@ -244,12 +244,6 @@ make_connection(JID, Pass, Server, Port, Tries, Method) ->
             whereis(ecomponent) ! connected,
             {R, XmppCom}
     catch
-        _Class:{error, not_auth_method_result} ->
-            lager:info("Fallback to Basic Auth~n",[]),
-            exmpp_session:stop(XmppCom),
-            clean_exit_normal(),
-            timer:sleep((20-Tries) * 200),
-            make_connection(JID, Pass, Server, Port, Tries-1, ?PLAIN);
         Class:Exception ->
             lager:warning("Exception ~p: ~p~n",[Class, Exception]),
             exmpp_session:stop(XmppCom),
