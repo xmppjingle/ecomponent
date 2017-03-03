@@ -270,11 +270,14 @@ setup_exmpp_component(XmppCom, JID, Pass, Server, Port)->
 get_method(Features) ->
     Mechanisms = [ exmpp_xml:get_cdata(X) || X <- exmpp_xml:get_elements(exmpp_xml:get_element(Features, mechanisms), mechanism)],
     lager:debug("Stream Mechanisms: ~p", [Mechanisms]),
-    preffered_method([ M || M <- Mechanisms, M == ?DIGEST]).
+    preffered_method(Mechanisms, ?DIGEST).
 
-preffered_method([?DIGEST]) ->
-    binary_to_list(?DIGEST);
-preffered_method(_) ->
+preffered_method(Mechanisms, Method) ->
+    preffered_method_([ M || M <- Mechanisms, M == Method], Method).
+
+preffered_method_([_M|_], Method) ->
+    binary_to_list(Method);
+preffered_method_(_, _) ->
     binary_to_list(?PLAIN).
 
 -spec clean_exit_normal() -> ok.
